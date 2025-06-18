@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>To-Do Experience</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f0f4ff, #fafafa);
+      padding: 30px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 650px;
+      width: 100%;
+      background: white;
+      padding: 25px 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    h1, h2, h3 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      padding: 10px 12px;
+      margin: 8px 0;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #d0d0d0;
+      width: calc(50% - 10px);
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 10px 16px;
+      font-size: 15px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(to right, #6a82fb, #fc5c7d);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.3s ease;
+    }
+
+    button:hover {
+      transform: scale(1.03);
+      background: linear-gradient(to right, #5f72ff, #ff5f7e);
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
+      margin-top: 0;
+    }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    li span.task-text {
+      flex-grow: 1;
+      font-size: 16px;
+      color: #34495e;
+    }
+
+    li span.task-points {
+      margin-left: 12px;
+      font-weight: bold;
+      font-size: 14px;
+      color: #27ae60;
+      text-shadow: 0 0 2px rgba(39, 174, 96, 0.3);
+    }
+
+    li button {
+      margin-left: 6px;
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
+    .complete-btn {
+      background-color: #2ecc71;
+    }
+
+    .edit-btn {
+      background-color: #f1c40f;
+      color: #333;
+    }
+
+    .delete-btn {
+      background-color: #e74c3c;
+    }
+
+    #history-select {
+      width: 100%;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      background-color: #fff;
+    }
+
+    .summary {
+      font-weight: bold;
+      font-size: 18px;
+      text-align: center;
+      margin: 10px 0;
+      color: #6c5ce7;
+    }
+
+    .footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #999;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>To-Do Experience</h1>
+
+    <div>
+      <input type="text" id="task-text" placeholder="Add a task" aria-label="Task description" />
+      <input type="number" id="task-points" placeholder="Points" min="1" aria-label="Task points" />
+      <button id="add-task-btn" disabled>Add Task</button>
+    </div>
+
+    <h2>Active Tasks</h2>
+    <ul id="active-tasks"></ul>
+
+    <h2>Current Week's Completed Tasks</h2>
+    <div class="summary" id="current-week-summary">Total Points: 0</div>
+    <ul id="completed-tasks"></ul>
+
+    <h2>Weekly History</h2>
+    <select id="history-select" aria-label="Select week for history">
+      <option value="">-- Select a week --</option>
+    </select>
+    <div class="summary" id="history-summary"></div>
+    <ul id="history-tasks"></ul>
+
+    <div class="footer">Made by Robbie – All data saved in your browser</div>
+  </div>
+
+  <script>
+    function getISOWeekString(date = new Date()) {
+    const d = new Date(date.getTime());
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+    const week1 = new Date(d.getFullYear(), 0, 4);
+    const weekNumber = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000
+        - 3 + ((week1.getDay() + 6) % 7)) / 7);
+    return `${d.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
+    }
+
+    function getWeekDateRange(isoWeekStr) {
+    const [yearStr, weekStr] = isoWeekStr.split('-W');
+    const year = parseInt(yearStr);
+    const week = parseInt(weekStr);
+
+    const simple = new Date(year, 0, 1 + (week - 1) * 7);
+    const dayOfWeek = simple.getDay();
+    const isoMonday = new Date(simple);
+    isoMonday.setDate(simple.getDate() - ((dayOfWeek + 6) % 7));
+
+    const isoSunday = new Date(isoMonday);
+    isoSunday.setDate(isoMonday.getDate() + 6);
+
+    const options = { month: 'short', day: 'numeric' };
+    const start = isoMonday.toLocaleDateString(undefined, options);
+    const end = isoSunday.toLocaleDateString(undefined, options);
+
+    return `${start} – ${end}, ${year}`;
+    }
+
+    let activeTasks = JSON.parse(localStorage.getItem('activeTasks')) || [];
+    let completedTasks = JSON.parse(localStorage.getItem('completedTasks')) || [];
+    let weeklyHistory = JSON.parse(localStorage.getItem('weeklyHistory')) || {};
+    let selectedHistoryWeek = "";
+
+    const taskTextInput = document.getElementById('task-text');
+    const taskPointsInput = document.getElementById('task-points');
+    const addTaskBtn = document.getElementById('add-task-btn');
+    const activeTasksUl = document.getElementById('active-tasks');
+    const completedTasksUl = document.getElementById('completed-tasks');
+    const currentWeekSummary = document.getElementById('current-week-summary');
+    const historySelect = document.getElementById('history-select');
+    const historyTasksUl = document.getElementById('history-tasks');
+    const historySummary = document.getElementById('history-summary');
+
+    function saveData() {
+      localStorage.setItem('activeTasks', JSON.stringify(activeTasks));
+      localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+      localStorage.setItem('weeklyHistory', JSON.stringify(weeklyHistory));
+    }
+
+    function checkInputs() {
+      addTaskBtn.disabled = !(taskTextInput.value.trim() && taskPointsInput.value && parseInt(taskPointsInput.value) > 0);
+    }
+
+    taskTextInput.addEventListener('input', checkInputs);
+    taskPointsInput.addEventListener('input', checkInputs);
+
+    function addTask() {
+      const text = taskTextInput.value.trim();
+      const points = parseInt(taskPointsInput.value);
+      if (!text || !points || points <= 0) return;
+
+      if (activeTasks.some(task => task.text === text)) {
+        alert("Task already exists.");
+        return;
+      }
+
+      activeTasks.push({ text, points });
+      activeTasks.sort((a, b) => b.points - a.points);
+      taskTextInput.value = '';
+      taskPointsInput.value = '';
+      addTaskBtn.disabled = true;
+      saveData();
+      renderActiveTasks();
+    }
+
+    function editTask(index) {
+      const task = activeTasks[index];
+      const newText = prompt("Edit task name:", task.text);
+      if (!newText) return;
+      const newPoints = prompt("Edit points:", task.points);
+      if (!newPoints || isNaN(newPoints) || newPoints <= 0) return;
+      task.text = newText.trim();
+      task.points = parseInt(newPoints);
+      activeTasks.sort((a, b) => b.points - a.points);
+      saveData();
+      renderActiveTasks();
+    }
+
+    function deleteTask(index) {
+      if (!confirm("Are you sure you want to delete this task?")) return;
+      activeTasks.splice(index, 1);
+      saveData();
+      renderActiveTasks();
+    }
+
+    function deleteCompleted(index) {
+      if (!confirm("Delete this completed task?")) return;
+      const task = completedTasks[index];
+      const week = getISOWeekString(new Date(task.completedAt));
+      completedTasks.splice(index, 1);
+      if (weeklyHistory[week]) {
+        weeklyHistory[week] = weeklyHistory[week].filter(t =>
+          !(t.text === task.text && t.completedAt === task.completedAt)
+        );
+        if (weeklyHistory[week].length === 0) delete weeklyHistory[week];
+      }
+      saveData();
+      renderCompletedTasks();
+      populateHistorySelector();
+      if (selectedHistoryWeek) renderHistoryWeek(selectedHistoryWeek);
+    }
+
+    function completeTask(index) {
+      const task = activeTasks.splice(index, 1)[0];
+      task.completedAt = new Date().toISOString();
+      completedTasks.push(task);
+      const weekKey = getISOWeekString(new Date(task.completedAt));
+      if (!weeklyHistory[weekKey]) weeklyHistory[weekKey] = [];
+      weeklyHistory[weekKey].push(task);
+      saveData();
+      renderActiveTasks();
+      renderCompletedTasks();
+      populateHistorySelector();
+      if (selectedHistoryWeek) renderHistoryWeek(selectedHistoryWeek);
+    }
+
+    function renderActiveTasks() {
+      activeTasksUl.innerHTML = '';
+      if (activeTasks.length === 0) {
+        activeTasksUl.innerHTML = '<li><i>No active tasks</i></li>';
+        return;
+      }
+      activeTasks.forEach((task, idx) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="task-text">${task.text}</span>
+          <span class="task-points">+${task.points} XP</span>
+          <button class="complete-btn" onclick="completeTask(${idx})">✔️</button>
+          <button class="edit-btn" onclick="editTask(${idx})">✏️</button>
+          <button class="delete-btn" onclick="deleteTask(${idx})">🗑️</button>
+        `;
+        activeTasksUl.appendChild(li);
+      });
+    }
+
+    function renderCompletedTasks() {
+      const week = getISOWeekString();
+      const thisWeekTasks = completedTasks.filter(t => getISOWeekString(new Date(t.completedAt)) === week);
+      completedTasksUl.innerHTML = '';
+      let total = 0;
+      if (thisWeekTasks.length === 0) {
+        completedTasksUl.innerHTML = '<li><i>No tasks completed this week</i></li>';
+        currentWeekSummary.textContent = 'Total Points: 0';
+        return;
+      }
+      thisWeekTasks.forEach((task, idx) => {
+        total += task.points;
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="task-text">${task.text}</span>
+          <span class="task-points">+${task.points} XP</span>
+          <button class="delete-btn" onclick="deleteCompleted(${idx})">🗑️</button>
+        `;
+        completedTasksUl.appendChild(li);
+      });
+      currentWeekSummary.textContent = `Total Points: ${total}`;
+    }
+
+    function populateHistorySelector() {
+      const weeks = Object.keys(weeklyHistory).sort().reverse();
+      historySelect.innerHTML = `<option value="">-- Select a week --</option>`;
+      weeks.forEach(week => {
+        const opt = document.createElement('option');
+        opt.value = week;
+        opt.textContent = getWeekDateRange(week);
+        if (week === selectedHistoryWeek) opt.selected = true;
+        historySelect.appendChild(opt);
+      });
+    }
+
+    function renderHistoryWeek(week) {
+      selectedHistoryWeek = week;
+      historyTasksUl.innerHTML = '';
+      historySummary.textContent = '';
+      if (!week || !weeklyHistory[week]) return;
+      const tasks = weeklyHistory[week];
+      let total = 0;
+      tasks.forEach(task => {
+        total += task.points;
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="task-text">${task.text}</span>
+          <span class="task-points">+${task.points} XP</span>
+        `;
+        historyTasksUl.appendChild(li);
+      });
+      historySummary.textContent = `Total Points: ${total}`;
+    }
+
+    addTaskBtn.onclick = addTask;
+    historySelect.onchange = () => renderHistoryWeek(historySelect.value);
+    
+    window.completeTask = completeTask;
+    window.editTask = editTask;
+    window.deleteTask = deleteTask;
+    window.deleteCompleted = deleteCompleted;
+    
+    renderActiveTasks();
+    renderCompletedTasks();
+    populateHistorySelector();
+  </script>
+</body>
+</html>
